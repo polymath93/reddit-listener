@@ -87,7 +87,10 @@ async function runMonitor() {
       let posts
       try {
         const res = await fetch(url, {
-          headers: { 'User-Agent': 'reddit-listener/1.0' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; reddit-listener/1.0; +https://github.com/polymath93/reddit-listener)',
+            'Accept': 'application/json',
+          },
         })
         if (!res.ok) {
           console.error(`[monitor] Reddit fetch failed for r/${subreddit} "${keyword}": ${res.status}`)
