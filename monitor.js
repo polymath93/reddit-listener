@@ -79,13 +79,10 @@ async function runMonitor() {
   const newIds = []
   let totalMatches = 0
 
-  // Only fetch posts from the last 24 hours
-  const after = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000)
-
   for (const subreddit of subreddits) {
     for (const keyword of includes) {
       const encodedKeyword = encodeURIComponent(keyword)
-      const url = `https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${subreddit}&title=${encodedKeyword}&limit=25&sort=desc&after=${after}`
+      const url = `https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${subreddit}&title=${encodedKeyword}&limit=25&sort=desc`
 
       let posts
       try {
