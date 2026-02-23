@@ -22,7 +22,7 @@ This is a single Railway service running two things from one process:
 
 **`monitor.js`** (plain JS) contains all Reddit polling logic:
 - Reads `data/config.json` for keywords/subreddits
-- Fetches `https://www.reddit.com/r/{sub}/search.json` for each subreddit×keyword pair
+- Fetches posts from **Arctic Shift API** (`https://arctic-shift.photon-reddit.com/api/posts/search`) — no auth required
 - Filters posts against excludes and `data/seen.json`
 - POSTs Slack Block Kit messages to `SLACK_WEBHOOK_URL`
 - Writes updated seen IDs (capped at 5000) and `lastRun`/`seenCount` back to disk
@@ -38,6 +38,7 @@ This is a single Railway service running two things from one process:
 
 - `server.js` and `monitor.js` are **plain CommonJS** (`require`/`module.exports`). All Next.js files are **TypeScript**.
 - Data lives in `data/config.json` and `data/seen.json` at the project root — no database.
-- `monitor.js` is loaded at runtime by the API route using an absolute `require()` path to avoid Next.js bundling it.
+- `monitor.js` is loaded at runtime via `global.__runMonitor` (set in `server.js`) — the API route calls this global instead of `require()`-ing `monitor.js` directly, because Next.js API routes run in a different working directory on Railway.
 - `PORT` is read from `process.env.PORT` (set automatically by Railway); defaults to 3000.
 - Required env var: `SLACK_WEBHOOK_URL`. Optional: `NODE_ENV`.
+- The Reddit JSON API returns 403 from cloud IPs — Arctic Shift is the workaround. Do not switch back to `reddit.com` endpoints.
