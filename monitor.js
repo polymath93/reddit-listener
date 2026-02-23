@@ -18,47 +18,6 @@ function writeJSON(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
 }
 
-let cachedToken = null
-let tokenExpiry = 0
-
-async function getRedditToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken
-
-  const clientId = process.env.REDDIT_CLIENT_ID
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET
-  const username = process.env.REDDIT_USERNAME
-  const password = process.env.REDDIT_PASSWORD
-
-  if (!clientId || !clientSecret) {
-    throw new Error('REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are required')
-  }
-
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-
-  const body = username && password
-    ? `grant_type=password&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
-    : 'grant_type=client_credentials'
-
-  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'reddit-listener/1.0 by polymath93',
-    },
-    body,
-  })
-
-  if (!res.ok) {
-    throw new Error(`Reddit auth failed: ${res.status} ${res.statusText}`)
-  }
-
-  const data = await res.json()
-  cachedToken = data.access_token
-  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000
-  return cachedToken
-}
-
 async function sendSlackNotification(post, keyword) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL
   if (!webhookUrl) {
@@ -120,34 +79,26 @@ async function runMonitor() {
   const newIds = []
   let totalMatches = 0
 
-  let token
-  try {
-    token = await getRedditToken()
-    console.log('[monitor] Reddit OAuth token obtained')
-  } catch (err) {
-    console.error('[monitor] Failed to get Reddit token:', err.message)
-    return
-  }
+  // Only fetch posts from the last 24 hours
+  const after = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000)
 
   for (const subreddit of subreddits) {
     for (const keyword of includes) {
       const encodedKeyword = encodeURIComponent(keyword)
-      const url = `https://oauth.reddit.com/r/${subreddit}/search.json?q=${encodedKeyword}&sort=new&limit=25&t=day&restrict_sr=1`
+      const url = `https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=${subreddit}&title=${encodedKeyword}&limit=25&sort=desc&after=${after}`
 
       let posts
       try {
         const res = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'reddit-listener/1.0 by polymath93',
-          },
+          headers: { 'User-Agent': 'reddit-listener/1.0 by polymath93' },
         })
         if (!res.ok) {
-          console.error(`[monitor] Reddit fetch failed for r/${subreddit} "${keyword}": ${res.status}`)
+          console.error(`[monitor] Arctic Shift fetch failed for r/${subreddit} "${keyword}": ${res.status}`)
           continue
         }
         const json = await res.json()
-        posts = json?.data?.children?.map((c) => c.data) || []
+        posts = json?.data || []
+        console.log(`[monitor] r/${subreddit} "${keyword}": ${posts.length} posts found`)
       } catch (err) {
         console.error(`[monitor] Fetch error for r/${subreddit} "${keyword}":`, err.message)
         continue
@@ -166,11 +117,9 @@ async function runMonitor() {
           continue
         }
 
-        // Verify the include keyword is actually in the post (Reddit search can be fuzzy)
+        // Verify the include keyword is actually in the post
         const hasKeyword = textToCheck.includes(keyword.toLowerCase())
-        if (!hasKeyword) {
-          continue
-        }
+        if (!hasKeyword) continue
 
         // Send notification
         try {
@@ -184,7 +133,7 @@ async function runMonitor() {
         newIds.push(post.id)
       }
 
-      // Small delay between requests to be polite to Reddit
+      // Small delay between requests
       await new Promise((r) => setTimeout(r, 500))
     }
   }
