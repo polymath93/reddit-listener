@@ -4,6 +4,7 @@ const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
 const { runMonitor } = require('./monitor')
+global.__runMonitor = runMonitor
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = '0.0.0.0'

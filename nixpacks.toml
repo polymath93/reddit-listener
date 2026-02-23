@@ -1,5 +1,5 @@
 [phases.build]
-cmds = ["ls -la /app", "npm run build"]
+cmds = ["npm run build"]
 
 [start]
 cmd = "node server.js"
