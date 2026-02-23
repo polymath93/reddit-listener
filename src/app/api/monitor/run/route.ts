@@ -5,12 +5,18 @@ export async function POST() {
   try {
     // Dynamically require monitor.js (plain JS, not transpiled)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    // Try cwd first (local dev), fall back to path relative to this file (Railway)
-    let monitorPath = path.join(process.cwd(), 'monitor.js')
     const fs = require('fs')
-    if (!fs.existsSync(monitorPath)) {
-      monitorPath = path.resolve(__dirname, '../../../../..', 'monitor.js')
-    }
+    // Try multiple possible paths and log them for debugging
+    const candidates = [
+      path.join(process.cwd(), 'monitor.js'),
+      path.resolve('/app', 'monitor.js'),
+      path.resolve(__dirname, '../../../../..', 'monitor.js'),
+      path.resolve(__dirname, '../../../../../', 'monitor.js'),
+    ]
+    console.log('[api/monitor/run] cwd:', process.cwd(), '__dirname:', __dirname)
+    console.log('[api/monitor/run] candidates:', candidates)
+    const monitorPath = candidates.find(p => fs.existsSync(p))
+    if (!monitorPath) throw new Error('monitor.js not found in: ' + candidates.join(', '))
     const { runMonitor } = require(monitorPath)
     await runMonitor()
     return NextResponse.json({ ok: true, ran: new Date().toISOString() })
